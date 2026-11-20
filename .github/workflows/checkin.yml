@@ -2,7 +2,9 @@ name: Trae Daily Checkin
 
 on:
   schedule:
+    # 每天 UTC 00:05（北京时间 08:05）签到
     - cron: "5 0 * * *"
+    # 每月 1 号 UTC 00:00 提交一次，避免 60 天无活动被 GitHub 停用
     - cron: "0 0 1 * *"
   workflow_dispatch:
 
@@ -11,7 +13,7 @@ permissions:
 
 jobs:
   checkin:
-    if: github.event.schedule != '0 0 1 * *'
+    if: github.event.schedule == '5 0 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -23,19 +25,14 @@ jobs:
         env:
           TRAE_COOKIE: ${{ secrets.TRAE_COOKIE }}
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-          FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}      - name: Checkin
-        env:
-          TRAE_COOKIE: ${{ secrets.TRAE_COOKIE }}
-          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
-          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}        # ← 新增
-          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}  # ← 新增
-          FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}        # ← 新增
-        run: python checkin.py
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}
         run: python checkin.py
 
   keepalive:
-    if: github.event.schedule == '0 0 1 * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '0 0 1 * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
