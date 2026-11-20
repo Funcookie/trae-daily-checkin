@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local secrets (NEVER commit cookies!)
+.env
+*.secret
+
+# Keepalive state
+.keepalive
