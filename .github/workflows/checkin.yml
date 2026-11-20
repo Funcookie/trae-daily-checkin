@@ -23,7 +23,15 @@ jobs:
         env:
           TRAE_COOKIE: ${{ secrets.TRAE_COOKIE }}
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}      - name: Checkin
+        env:
+          TRAE_COOKIE: ${{ secrets.TRAE_COOKIE }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}        # ← 新增
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}  # ← 新增
+          FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}        # ← 新增
+        run: python checkin.py
         run: python checkin.py
 
   keepalive:
