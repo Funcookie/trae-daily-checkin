@@ -83,33 +83,74 @@ def claim_credits(token):
 
 
 def notify(title, lines):
-    """推送飞书群机器人消息，未配置 Webhook 则静默跳过。"""
+    """推送飞书通知。支持两种模式：
+    1) Webhook 模式（自定义机器人）: FEISHU_WEBHOOK [+ FEISHU_SECRET]
+    2) 自建应用模式: FEISHU_APP_ID + FEISHU_APP_SECRET + FEISHU_CHAT_ID
+    未配置任何凭证则静默跳过。
+    """
+    text = title + "\n" + "\n".join(lines)
     webhook = os.environ.get("FEISHU_WEBHOOK", "").strip()
-    if not webhook:
+
+    if webhook:
+        # ── 模式 1: Webhook ──────────────────────────────────────
+        body = {"msg_type": "text", "content": {"text": text}}
+        secret = os.environ.get("FEISHU_SECRET", "").strip()
+        if secret:
+            timestamp = str(int(time.time()))
+            string_to_sign = f"{timestamp}\n{secret}"
+            sign = base64.b64encode(
+                hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
+            ).decode()
+            body["timestamp"] = timestamp
+            body["sign"] = sign
+        try:
+            req = urllib.request.Request(
+                webhook, data=json.dumps(body).encode("utf-8"),
+                method="POST", headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=20).read()
+        except Exception as exc:
+            print(f"[warn] 飞书 Webhook 通知失败: {exc}")
         return
-    body = {"msg_type": "text", "content": {"text": title + "\n" + "\n".join(lines)}}
 
-    secret = os.environ.get("FEISHU_SECRET", "").strip()
-    if secret:
-        # 飞书签名校验：以 "{timestamp}\n{secret}" 作为 HMAC-SHA256 的 key
-        timestamp = str(int(time.time()))
-        string_to_sign = f"{timestamp}\n{secret}"
-        sign = base64.b64encode(
-            hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
-        ).decode()
-        body["timestamp"] = timestamp
-        body["sign"] = sign
+    # ── 模式 2: 自建应用 API ────────────────────────────────────
+    app_id = os.environ.get("FEISHU_APP_ID", "").strip()
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "").strip()
+    chat_id = os.environ.get("FEISHU_CHAT_ID", "").strip()
+    if not (app_id and app_secret and chat_id):
+        return  # 未配置任何通知方式，静默跳过
 
-    req = urllib.request.Request(
-        webhook,
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-        headers={"Content-Type": "application/json"},
-    )
     try:
-        urllib.request.urlopen(req, timeout=20).read()
-    except Exception as exc:  # 通知失败不影响签到结果
-        print(f"[warn] 飞书通知发送失败: {exc}")
+        # 2a. 获取 tenant_access_token
+        token_body = json.dumps({"app_id": app_id, "app_secret": app_secret}).encode()
+        token_req = urllib.request.Request(
+            "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+            data=token_body, method="POST", headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(token_req, timeout=20) as resp:
+            token_data = json.loads(resp.read())
+        tenant_token = token_data.get("tenant_access_token")
+        if not tenant_token:
+            print(f"[warn] 获取 tenant_access_token 失败: {token_data}")
+            return
+
+        # 2b. 发送消息
+        msg_body = json.dumps({
+            "receive_id": chat_id,
+            "msg_type": "text",
+            "content": json.dumps({"text": text}),
+        }).encode()
+        msg_req = urllib.request.Request(
+            "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+            data=msg_body, method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {tenant_token}",
+            },
+        )
+        urllib.request.urlopen(msg_req, timeout=20).read()
+    except Exception as exc:
+        print(f"[warn] 飞书自建应用通知失败: {exc}")
 
 
 def describe(info):
